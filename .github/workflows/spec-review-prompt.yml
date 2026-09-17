@@ -1,0 +1,41 @@
+name: spec-review-prompt
+
+# CIはAIを一切呼び出さない。プルリクエストを開いた/更新したタイミングで、
+# 固定プロンプト(.github/SPEC_REVIEW_PROMPT.md)に今回の仕様書本文を埋め込んだ
+# 状態でPRコメントとして提示するところまでを自動化する。実際にAIへ投げて
+# 結果を確認する作業は、レビュワーが外部のAIツールでコピー&ペーストして行う。
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "spec/**"
+
+permissions:
+  pull-requests: write
+
+jobs:
+  post-review-prompt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 固定プロンプトに仕様書本文を埋め込んでPRコメントとして投稿する
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### 🪞 AIによる仕様書レビューを実施してください"
+            echo ""
+            echo "以下のプロンプトをコピーし、【確認してほしい観点】を今回の案件に合わせて埋めた上で、"
+            echo "外部のAIツールに貼り付けて確認してください。このコメント自体はAIを呼び出していません。"
+            echo ""
+            echo '```text'
+            cat .github/SPEC_REVIEW_PROMPT.md
+            echo ""
+            echo "【仕様書(spec/current-spec.md)】"
+            cat spec/current-spec.md
+            echo '```'
+          } > /tmp/comment-body.txt
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/comment-body.txt
