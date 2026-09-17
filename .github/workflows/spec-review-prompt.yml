@@ -20,7 +20,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 固定プロンプトに仕様書本文を埋め込んでPRコメントとして投稿する
+      - name: 固定プロンプトのプレースホルダを仕様書本文で置換する
+        run: |
+          set -euo pipefail
+          awk -v specfile="spec/current-spec.md" '
+            /^\(ここに仕様書の本文を貼り付ける\)$/ {
+              while ((getline line < specfile) > 0) print line
+              next
+            }
+            { print }
+          ' .github/SPEC_REVIEW_PROMPT.md > /tmp/filled-prompt.txt
+
+      - name: 埋め込み後のプロンプトをPRコメントとして投稿する
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -32,10 +43,7 @@ jobs:
             echo "このコメント自体はAIを呼び出していません。"
             echo ""
             echo '```text'
-            cat .github/SPEC_REVIEW_PROMPT.md
-            echo ""
-            echo "【仕様書(spec/current-spec.md)】"
-            cat spec/current-spec.md
+            cat /tmp/filled-prompt.txt
             echo '```'
           } > /tmp/comment-body.txt
           gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/comment-body.txt
